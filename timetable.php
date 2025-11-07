@@ -4,8 +4,9 @@ require_once 'config/session.php';
 requireLogin();
 
 $pageTitle = 'ตารางสอน';
-$viewType = $_GET['view'] ?? 'all'; // all, teacher, student, classroom
+$viewType = $_GET['view'] ?? 'all'; // all, teacher, student, classroom, group
 $filterId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+$groupCode = isset($_GET['group']) ? trim($_GET['group']) : '';
 
 $days = ['', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
 $periodsPerDay = 8;
@@ -41,6 +42,9 @@ if ($viewType === 'teacher' && $filterId > 0) {
         AND (t.student_group IS NULL OR t.student_group = st.grade)
     ";
     $params[] = $filterId;
+} elseif ($viewType === 'group' && $groupCode !== '') {
+    $query .= " WHERE t.student_group = ?";
+    $params[] = $groupCode;
 }
 
 $query .= " ORDER BY t.day_of_week, t.period";
@@ -59,10 +63,24 @@ foreach ($timetableEntries as $entry) {
 $teachers = $pdo->query("SELECT * FROM teachers ORDER BY teacher_code")->fetchAll();
 $classrooms = $pdo->query("SELECT * FROM classrooms ORDER BY room_code")->fetchAll();
 $students = $pdo->query("SELECT * FROM students ORDER BY student_code")->fetchAll();
+$groupResult = $pdo->query("SELECT DISTINCT grade FROM students WHERE grade IS NOT NULL AND grade <> '' ORDER BY grade");
+$groups = $groupResult->fetchAll(PDO::FETCH_COLUMN);
+$extraGroups = $pdo->query("SELECT DISTINCT student_group FROM timetable WHERE student_group IS NOT NULL AND student_group <> '' ORDER BY student_group")->fetchAll(PDO::FETCH_COLUMN);
+$groups = array_values(array_unique(array_merge($groups, $extraGroups)));
+
+$canExportPdf = false;
+$autoloadPath = __DIR__ . '/vendor/autoload.php';
+if (file_exists($autoloadPath)) {
+    require_once $autoloadPath;
+    if (class_exists('Mpdf\\Mpdf')) {
+        $canExportPdf = true;
+    }
+}
 
 $selectedTeacher = null;
 $selectedClassroom = null;
 $selectedStudent = null;
+$selectedGroup = null;
 
 if ($viewType === 'teacher' && $filterId > 0) {
     foreach ($teachers as $teacher) {
@@ -85,6 +103,8 @@ if ($viewType === 'teacher' && $filterId > 0) {
             break;
         }
     }
+} elseif ($viewType === 'group' && $groupCode !== '') {
+    $selectedGroup = $groupCode;
 }
 
 require_once 'includes/header.php';
@@ -95,7 +115,7 @@ require_once 'includes/header.php';
 </div>
 
 <!-- Filter Options -->
-<div class="bg-white rounded-lg shadow-md p-6 mb-6">
+<div class="bg-white rounded-lg shadow-md p-6 mb-6 no-print">
     <h2 class="text-xl font-bold text-gray-800 mb-4">ตัวกรอง</h2>
     <div class="flex flex-wrap gap-4">
         <a href="?view=all" class="px-4 py-2 rounded <?php echo $viewType === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'; ?>">
@@ -134,6 +154,17 @@ require_once 'includes/header.php';
                 <?php endforeach; ?>
             </select>
         </div>
+
+        <div class="relative">
+            <select onchange="window.location.href=this.value ? '?view=group&group='+encodeURIComponent(this.value) : '?view=all'" class="px-4 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">-- เลือกกลุ่มเรียน --</option>
+                <?php foreach ($groups as $group): ?>
+                    <option value="<?php echo htmlspecialchars($group); ?>" <?php echo ($viewType === 'group' && $groupCode === $group) ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars($group); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
     </div>
 </div>
 
@@ -152,6 +183,9 @@ require_once 'includes/header.php';
     } elseif ($selectedStudent) {
         $titleText = 'ตารางเรียนของนักเรียน: ' . htmlspecialchars($selectedStudent['full_name']);
         $subtitleText = 'รหัสนักเรียน: ' . htmlspecialchars($selectedStudent['student_code']) . ' • ห้อง: ' . htmlspecialchars($selectedStudent['grade']);
+    } elseif ($selectedGroup) {
+        $titleText = 'ตารางเรียนของกลุ่ม: ' . htmlspecialchars($selectedGroup);
+        $subtitleText = 'กลุ่มเรียน: ' . htmlspecialchars($selectedGroup);
     }
     ?>
 
@@ -163,15 +197,26 @@ require_once 'includes/header.php';
             <?php endif; ?>
         </div>
         <?php if (count($timetableEntries) > 0): ?>
-            <?php
-            $exportUrl = 'export_timetable_pdf.php?view=' . urlencode($viewType);
-            if ($filterId > 0) {
-                $exportUrl .= '&id=' . $filterId;
-            }
-            ?>
-            <a href="<?php echo $exportUrl; ?>" target="_blank" class="inline-flex items-center bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded shadow">
-                📄 ดาวน์โหลด PDF
-            </a>
+            <div class="flex flex-wrap items-center gap-2 no-print">
+                <button type="button" onclick="window.print()" class="inline-flex items-center bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded shadow">
+                    🖨️ พิมพ์ / บันทึก PDF
+                </button>
+                <?php if ($canExportPdf): ?>
+                    <?php
+                    $exportUrl = 'export_timetable_pdf.php?view=' . urlencode($viewType);
+                    if ($filterId > 0) {
+                        $exportUrl .= '&id=' . $filterId;
+                    } elseif ($groupCode !== '') {
+                        $exportUrl .= '&group=' . urlencode($groupCode);
+                    }
+                    ?>
+                    <a href="<?php echo $exportUrl; ?>" target="_blank" class="inline-flex items-center bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded shadow">
+                        📄 ดาวน์โหลด PDF (mPDF)
+                    </a>
+                <?php else: ?>
+                    <span class="text-sm text-gray-500"> PDF</span>
+                <?php endif; ?>
+            </div>
         <?php endif; ?>
     </div>
     

@@ -5,6 +5,7 @@ requireLogin();
 
 $viewType = $_GET['view'] ?? 'all';
 $filterId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+$groupCode = isset($_GET['group']) ? trim($_GET['group']) : '';
 
 $autoloadPath = __DIR__ . '/vendor/autoload.php';
 if (!file_exists($autoloadPath)) {
@@ -13,7 +14,11 @@ if (!file_exists($autoloadPath)) {
 
 require_once $autoloadPath;
 
-use Dompdf\Dompdf;
+if (!class_exists('Mpdf\\Mpdf')) {
+    die('ไม่พบไลบรารี mPDF กรุณาติดตั้งด้วยคำสั่ง composer require mpdf/mpdf แล้วลองใหม่อีกครั้ง');
+}
+
+use Mpdf\Mpdf;
 
 $days = ['', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
 $periodsPerDay = 8;
@@ -49,6 +54,9 @@ if ($viewType === 'teacher' && $filterId > 0) {
         AND (t.student_group IS NULL OR t.student_group = st.grade)
     ";
     $params[] = $filterId;
+} elseif ($viewType === 'group' && $groupCode !== '') {
+    $query .= " WHERE t.student_group = ?";
+    $params[] = $groupCode;
 }
 
 $query .= " ORDER BY t.day_of_week, t.period";
@@ -60,6 +68,7 @@ $entries = $stmt->fetchAll();
 $teachers = $pdo->query("SELECT * FROM teachers ORDER BY teacher_code")->fetchAll();
 $classrooms = $pdo->query("SELECT * FROM classrooms ORDER BY room_code")->fetchAll();
 $students = $pdo->query("SELECT * FROM students ORDER BY student_code")->fetchAll();
+$groups = $pdo->query("SELECT DISTINCT student_group FROM timetable WHERE student_group IS NOT NULL AND student_group <> '' ORDER BY student_group")->fetchAll(PDO::FETCH_COLUMN);
 
 $titleText = 'ตารางสอนทั้งหมด';
 $subtitleText = '';
@@ -88,6 +97,9 @@ if ($viewType === 'teacher' && $filterId > 0) {
             break;
         }
     }
+} elseif ($viewType === 'group' && $groupCode !== '') {
+    $titleText = 'ตารางเรียนของกลุ่ม: ' . $groupCode;
+    $subtitleText = 'กลุ่มเรียน: ' . $groupCode;
 }
 
 // Build timetable matrix
@@ -202,17 +214,26 @@ ob_start();
 <?php
 $html = ob_get_clean();
 
-$dompdf = new Dompdf();
-$dompdf->loadHtml($html, 'UTF-8');
-$dompdf->setPaper('A4', 'landscape');
-$dompdf->render();
+$tempDir = __DIR__ . '/tmp';
+if (!is_dir($tempDir)) {
+    mkdir($tempDir, 0777, true);
+}
+
+$mpdf = new Mpdf([
+    'mode' => 'utf-8',
+    'format' => 'A4-L',
+    'tempDir' => $tempDir
+]);
+$mpdf->WriteHTML($html);
 
 $filename = 'timetable-' . $viewType;
 if ($filterId > 0) {
     $filename .= '-' . $filterId;
+} elseif ($groupCode !== '') {
+    $filename .= '-' . preg_replace('/[^A-Za-z0-9_-]+/', '-', $groupCode);
 }
 $filename .= '.pdf';
 
-$dompdf->stream($filename, ['Attachment' => false]);
+$mpdf->Output($filename, 'I');
 exit;
 

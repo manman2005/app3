@@ -7,6 +7,14 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         [x-cloak] { display: none !important; }
+        .no-print { display: block; }
+        .print-only { display: none !important; }
+        @media print {
+            body { background: #fff !important; }
+            nav, footer, .no-print { display: none !important; }
+            main { padding: 0 !important; margin: 0 !important; }
+            .print-only { display: block !important; }
+        }
     </style>
 </head>
 <body class="bg-gray-100">

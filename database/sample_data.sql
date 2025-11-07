@@ -25,16 +25,16 @@ INSERT INTO teachers (teacher_code, full_name, email, phone) VALUES
 
 -- Students
 INSERT INTO students (student_code, full_name, email, phone, grade) VALUES
-('S001', 'กิตติพงษ์ แสงทอง', 's001@example.com', '0901111111', 'ม.1/1'),
-('S002', 'จิราพร นาคไทย', 's002@example.com', '0901111112', 'ม.1/1'),
-('S003', 'ธีรภัทร อนุรักษ์', 's003@example.com', '0901111113', 'ม.1/2'),
-('S004', 'นฤมล สาระดี', 's004@example.com', '0901111114', 'ม.1/2'),
-('S005', 'พงศกร ศรีชัย', 's005@example.com', '0901111115', 'ม.2/1'),
-('S006', 'ศุภนิดา แก้วใส', 's006@example.com', '0901111116', 'ม.2/1'),
-('S007', 'อภิสิทธิ์ สุวรรณ', 's007@example.com', '0901111117', 'ม.2/2'),
-('S008', 'กาญจนา รุ่งเรือง', 's008@example.com', '0901111118', 'ม.2/2'),
-('S009', 'ธนกฤต นามบุญ', 's009@example.com', '0901111119', 'ม.3/1'),
-('S010', 'ลลิตา สุนทร', 's010@example.com', '0901111120', 'ม.3/1');
+('S001', 'กิตติพงษ์ แสงทอง', 's001@example.com', '0901111111', 'ปวช1/1'),
+('S002', 'จิราพร นาคไทย', 's002@example.com', '0901111112', 'ปวช1/1'),
+('S003', 'ธีรภัทร อนุรักษ์', 's003@example.com', '0901111113', 'ปวช1/2'),
+('S004', 'นฤมล สาระดี', 's004@example.com', '0901111114', 'ปวช1/2'),
+('S005', 'พงศกร ศรีชัย', 's005@example.com', '0901111115', 'ปวช2/1'),
+('S006', 'ศุภนิดา แก้วใส', 's006@example.com', '0901111116', 'ปวช2/1'),
+('S007', 'อภิสิทธิ์ สุวรรณ', 's007@example.com', '0901111117', 'ปวช2/2'),
+('S008', 'กาญจนา รุ่งเรือง', 's008@example.com', '0901111118', 'ปวช2/2'),
+('S009', 'ธนกฤต นามบุญ', 's009@example.com', '0901111119', 'ปวช3/1'),
+('S010', 'ลลิตา สุนทร', 's010@example.com', '0901111120', 'ปวช3/1');
 
 -- Subjects
 INSERT INTO subjects (subject_code, subject_name, credits) VALUES
@@ -108,52 +108,52 @@ SELECT st.id, s.id FROM students st, subjects s WHERE st.student_code = 'S010' A
 
 -- Timetable sample entries
 INSERT INTO timetable (day_of_week, period, teacher_id, subject_id, classroom_id, student_group)
-SELECT 1, 1, t.id, s.id, c.id, 'ม.1/1'
+SELECT 1, 1, t.id, s.id, c.id, 'ปวช1/1'
 FROM teachers t, subjects s, classrooms c
 WHERE t.teacher_code = 'T001' AND s.subject_code = 'SUB001' AND c.room_code = 'R101';
 
 INSERT INTO timetable (day_of_week, period, teacher_id, subject_id, classroom_id, student_group)
-SELECT 1, 2, t.id, s.id, c.id, 'ม.1/1'
+SELECT 1, 2, t.id, s.id, c.id, 'ปวช1/1'
 FROM teachers t, subjects s, classrooms c
 WHERE t.teacher_code = 'T002' AND s.subject_code = 'SUB002' AND c.room_code = 'R101';
 
 INSERT INTO timetable (day_of_week, period, teacher_id, subject_id, classroom_id, student_group)
-SELECT 1, 3, t.id, s.id, c.id, 'ม.1/2'
+SELECT 1, 3, t.id, s.id, c.id, 'ปวช1/2'
 FROM teachers t, subjects s, classrooms c
 WHERE t.teacher_code = 'T003' AND s.subject_code = 'SUB003' AND c.room_code = 'R102';
 
 INSERT INTO timetable (day_of_week, period, teacher_id, subject_id, classroom_id, student_group)
-SELECT 1, 4, t.id, s.id, c.id, 'ม.1/2'
+SELECT 1, 4, t.id, s.id, c.id, 'ปวช1/2'
 FROM teachers t, subjects s, classrooms c
 WHERE t.teacher_code = 'T004' AND s.subject_code = 'SUB004' AND c.room_code = 'R102';
 
 INSERT INTO timetable (day_of_week, period, teacher_id, subject_id, classroom_id, student_group)
-SELECT 2, 1, t.id, s.id, c.id, 'ม.2/1'
+SELECT 2, 1, t.id, s.id, c.id, 'ปวช2/1'
 FROM teachers t, subjects s, classrooms c
 WHERE t.teacher_code = 'T005' AND s.subject_code = 'SUB005' AND c.room_code = 'R103';
 
 INSERT INTO timetable (day_of_week, period, teacher_id, subject_id, classroom_id, student_group)
-SELECT 2, 2, t.id, s.id, c.id, 'ม.2/1'
+SELECT 2, 2, t.id, s.id, c.id, 'ปวช2/1'
 FROM teachers t, subjects s, classrooms c
 WHERE t.teacher_code = 'T006' AND s.subject_code = 'SUB006' AND c.room_code = 'R103';
 
 INSERT INTO timetable (day_of_week, period, teacher_id, subject_id, classroom_id, student_group)
-SELECT 2, 3, t.id, s.id, c.id, 'ม.2/2'
+SELECT 2, 3, t.id, s.id, c.id, 'ปวช2/2'
 FROM teachers t, subjects s, classrooms c
 WHERE t.teacher_code = 'T007' AND s.subject_code = 'SUB007' AND c.room_code = 'R202';
 
 INSERT INTO timetable (day_of_week, period, teacher_id, subject_id, classroom_id, student_group)
-SELECT 2, 4, t.id, s.id, c.id, 'ม.2/2'
+SELECT 2, 4, t.id, s.id, c.id, 'ปวช2/2'
 FROM teachers t, subjects s, classrooms c
 WHERE t.teacher_code = 'T008' AND s.subject_code = 'SUB008' AND c.room_code = 'R203';
 
 INSERT INTO timetable (day_of_week, period, teacher_id, subject_id, classroom_id, student_group)
-SELECT 3, 1, t.id, s.id, c.id, 'ม.3/1'
+SELECT 3, 1, t.id, s.id, c.id, 'ปวช3/1'
 FROM teachers t, subjects s, classrooms c
 WHERE t.teacher_code = 'T009' AND s.subject_code = 'SUB009' AND c.room_code = 'R204';
 
 INSERT INTO timetable (day_of_week, period, teacher_id, subject_id, classroom_id, student_group)
-SELECT 3, 2, t.id, s.id, c.id, 'ม.3/1'
+SELECT 3, 2, t.id, s.id, c.id, 'ปวช3/1'
 FROM teachers t, subjects s, classrooms c
 WHERE t.teacher_code = 'T010' AND s.subject_code = 'SUB010' AND c.room_code = 'R205';
 
