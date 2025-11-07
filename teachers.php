@@ -1,0 +1,172 @@
+<?php
+require_once 'config/database.php';
+require_once 'config/session.php';
+requireLogin();
+
+$pageTitle = 'จัดการครู';
+$message = '';
+$messageType = '';
+
+// Handle form submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['action'])) {
+        if ($_POST['action'] === 'add') {
+            $teacher_code = $_POST['teacher_code'] ?? '';
+            $full_name = $_POST['full_name'] ?? '';
+            $email = $_POST['email'] ?? '';
+            $phone = $_POST['phone'] ?? '';
+            
+            try {
+                $stmt = $pdo->prepare("INSERT INTO teachers (teacher_code, full_name, email, phone) VALUES (?, ?, ?, ?)");
+                $stmt->execute([$teacher_code, $full_name, $email, $phone]);
+                $message = 'เพิ่มครูสำเร็จ';
+                $messageType = 'success';
+            } catch (PDOException $e) {
+                $message = 'เกิดข้อผิดพลาด: ' . $e->getMessage();
+                $messageType = 'error';
+            }
+        } elseif ($_POST['action'] === 'edit') {
+            $id = $_POST['id'] ?? 0;
+            $teacher_code = $_POST['teacher_code'] ?? '';
+            $full_name = $_POST['full_name'] ?? '';
+            $email = $_POST['email'] ?? '';
+            $phone = $_POST['phone'] ?? '';
+            
+            try {
+                $stmt = $pdo->prepare("UPDATE teachers SET teacher_code = ?, full_name = ?, email = ?, phone = ? WHERE id = ?");
+                $stmt->execute([$teacher_code, $full_name, $email, $phone, $id]);
+                $message = 'แก้ไขข้อมูลครูสำเร็จ';
+                $messageType = 'success';
+            } catch (PDOException $e) {
+                $message = 'เกิดข้อผิดพลาด: ' . $e->getMessage();
+                $messageType = 'error';
+            }
+        } elseif ($_POST['action'] === 'delete') {
+            $id = $_POST['id'] ?? 0;
+            try {
+                $stmt = $pdo->prepare("DELETE FROM teachers WHERE id = ?");
+                $stmt->execute([$id]);
+                $message = 'ลบครูสำเร็จ';
+                $messageType = 'success';
+            } catch (PDOException $e) {
+                $message = 'เกิดข้อผิดพลาด: ' . $e->getMessage();
+                $messageType = 'error';
+            }
+        }
+    }
+}
+
+// Get all teachers
+$teachers = $pdo->query("SELECT * FROM teachers ORDER BY teacher_code")->fetchAll();
+
+// Get teacher for editing
+$editTeacher = null;
+if (isset($_GET['edit'])) {
+    $id = $_GET['edit'];
+    $stmt = $pdo->prepare("SELECT * FROM teachers WHERE id = ?");
+    $stmt->execute([$id]);
+    $editTeacher = $stmt->fetch();
+}
+
+require_once 'includes/header.php';
+?>
+
+<div class="mb-6">
+    <h1 class="text-3xl font-bold text-gray-800 mb-2">👨‍🏫 จัดการครู</h1>
+</div>
+
+<?php if ($message): ?>
+    <div class="mb-4 p-4 rounded <?php echo $messageType === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'; ?>">
+        <?php echo htmlspecialchars($message); ?>
+    </div>
+<?php endif; ?>
+
+<!-- Add/Edit Form -->
+<div class="bg-white rounded-lg shadow-md p-6 mb-6">
+    <h2 class="text-xl font-bold text-gray-800 mb-4">
+        <?php echo $editTeacher ? 'แก้ไขข้อมูลครู' : 'เพิ่มครูใหม่'; ?>
+    </h2>
+    <form method="POST" action="">
+        <?php if ($editTeacher): ?>
+            <input type="hidden" name="id" value="<?php echo $editTeacher['id']; ?>">
+            <input type="hidden" name="action" value="edit">
+        <?php else: ?>
+            <input type="hidden" name="action" value="add">
+        <?php endif; ?>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">รหัสครู *</label>
+                <input type="text" name="teacher_code" required
+                       value="<?php echo $editTeacher ? htmlspecialchars($editTeacher['teacher_code']) : ''; ?>"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">ชื่อ-นามสกุล *</label>
+                <input type="text" name="full_name" required
+                       value="<?php echo $editTeacher ? htmlspecialchars($editTeacher['full_name']) : ''; ?>"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">อีเมล</label>
+                <input type="email" name="email"
+                       value="<?php echo $editTeacher ? htmlspecialchars($editTeacher['email']) : ''; ?>"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">เบอร์โทรศัพท์</label>
+                <input type="text" name="phone"
+                       value="<?php echo $editTeacher ? htmlspecialchars($editTeacher['phone']) : ''; ?>"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+        </div>
+        
+        <div class="mt-4">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                <?php echo $editTeacher ? 'บันทึกการแก้ไข' : 'เพิ่มครู'; ?>
+            </button>
+            <?php if ($editTeacher): ?>
+                <a href="teachers.php" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded ml-2">ยกเลิก</a>
+            <?php endif; ?>
+        </div>
+    </form>
+</div>
+
+<!-- Teachers List -->
+<div class="bg-white rounded-lg shadow-md p-6">
+    <h2 class="text-xl font-bold text-gray-800 mb-4">รายชื่อครู</h2>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">รหัสครู</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ชื่อ-นามสกุล</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">อีเมล</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">เบอร์โทร</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">จัดการ</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                <?php foreach ($teachers as $teacher): ?>
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($teacher['teacher_code']); ?></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($teacher['full_name']); ?></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($teacher['email'] ?: '-'); ?></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($teacher['phone'] ?: '-'); ?></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <a href="?edit=<?php echo $teacher['id']; ?>" class="text-blue-600 hover:text-blue-800 mr-3">แก้ไข</a>
+                            <form method="POST" action="" class="inline" onsubmit="return confirm('คุณแน่ใจหรือไม่ว่าต้องการลบ?');">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="id" value="<?php echo $teacher['id']; ?>">
+                                <button type="submit" class="text-red-600 hover:text-red-800">ลบ</button>
+                            </form>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<?php require_once 'includes/footer.php'; ?>
+
