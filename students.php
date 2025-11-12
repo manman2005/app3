@@ -1,42 +1,77 @@
 <?php
 require_once 'config/database.php';
 require_once 'config/session.php';
+require_once 'config/helpers.php';
 requireLogin();
+requireRole('admin');
 
 $pageTitle = 'จัดการนักเรียน';
 $message = '';
 $messageType = '';
 
+// Get class groups for dropdown
+$classGroups = $pdo->query("SELECT * FROM class_groups ORDER BY group_code")->fetchAll();
+
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action'])) {
         if ($_POST['action'] === 'add') {
-            $student_code = $_POST['student_code'] ?? '';
             $full_name = $_POST['full_name'] ?? '';
+            $gender = $_POST['gender'] ?? 'ชาย';
+            $birthdate = $_POST['birthdate'] ?? null;
+            $class_group_id = $_POST['class_group_id'] ?? null;
+            $username = $_POST['username'] ?? '';
+            $password = $_POST['password'] ?? '';
             $email = $_POST['email'] ?? '';
             $phone = $_POST['phone'] ?? '';
-            $grade = $_POST['grade'] ?? '';
             
             try {
-                $stmt = $pdo->prepare("INSERT INTO students (student_code, full_name, email, phone, grade) VALUES (?, ?, ?, ?, ?)");
-                $stmt->execute([$student_code, $full_name, $email, $phone, $grade]);
-                $message = 'เพิ่มนักเรียนสำเร็จ';
+                // Get class group info for code generation
+                if ($class_group_id) {
+                    $stmt = $pdo->prepare("
+                        SELECT cg.*, st.type_code, m.major_code 
+                        FROM class_groups cg
+                        LEFT JOIN subject_types st ON cg.subject_type_id = st.id
+                        LEFT JOIN majors m ON cg.major_id = m.id
+                        WHERE cg.id = ?
+                    ");
+                    $stmt->execute([$class_group_id]);
+                    $group = $stmt->fetch();
+                    
+                    if ($group) {
+                        $sequence = getNextStudentSequence($pdo, $group['entry_year'], $group['level'], $group['type_code'], $group['major_code']);
+                        $student_code = generateStudentCode($group['entry_year'], $group['level'], $group['type_code'], $group['major_code'], $sequence);
+                    } else {
+                        throw new Exception("ไม่พบข้อมูลกลุ่มเรียน");
+                    }
+                } else {
+                    throw new Exception("กรุณาเลือกกลุ่มเรียน");
+                }
+                
+                // Hash password if provided
+                $hashedPassword = !empty($password) ? password_hash($password, PASSWORD_DEFAULT) : null;
+                
+                $stmt = $pdo->prepare("INSERT INTO students (student_code, full_name, gender, birthdate, class_group_id, username, password, email, phone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$student_code, $full_name, $gender, $birthdate ?: null, $class_group_id, $username ?: null, $hashedPassword, $email ?: null, $phone ?: null]);
+                $message = 'เพิ่มนักเรียนสำเร็จ (รหัส: ' . $student_code . ')';
                 $messageType = 'success';
-            } catch (PDOException $e) {
+            } catch (Exception $e) {
                 $message = 'เกิดข้อผิดพลาด: ' . $e->getMessage();
                 $messageType = 'error';
             }
         } elseif ($_POST['action'] === 'edit') {
             $id = $_POST['id'] ?? 0;
-            $student_code = $_POST['student_code'] ?? '';
             $full_name = $_POST['full_name'] ?? '';
+            $gender = $_POST['gender'] ?? 'ชาย';
+            $birthdate = $_POST['birthdate'] ?? null;
+            $class_group_id = $_POST['class_group_id'] ?? null;
+            $username = $_POST['username'] ?? '';
             $email = $_POST['email'] ?? '';
             $phone = $_POST['phone'] ?? '';
-            $grade = $_POST['grade'] ?? '';
             
             try {
-                $stmt = $pdo->prepare("UPDATE students SET student_code = ?, full_name = ?, email = ?, phone = ?, grade = ? WHERE id = ?");
-                $stmt->execute([$student_code, $full_name, $email, $phone, $grade, $id]);
+                $stmt = $pdo->prepare("UPDATE students SET full_name = ?, gender = ?, birthdate = ?, class_group_id = ?, username = ?, email = ?, phone = ? WHERE id = ?");
+                $stmt->execute([$full_name, $gender, $birthdate ?: null, $class_group_id, $username ?: null, $email ?: null, $phone ?: null, $id]);
                 $message = 'แก้ไขข้อมูลนักเรียนสำเร็จ';
                 $messageType = 'success';
             } catch (PDOException $e) {
@@ -58,8 +93,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Get all students
-$students = $pdo->query("SELECT * FROM students ORDER BY student_code")->fetchAll();
+// Get all students with class group info
+$students = $pdo->query("
+    SELECT s.*, cg.group_name, cg.group_code 
+    FROM students s
+    LEFT JOIN class_groups cg ON s.class_group_id = cg.id
+    ORDER BY s.student_code
+")->fetchAll();
 
 // Get student for editing
 $editStudent = null;
@@ -96,13 +136,17 @@ require_once 'includes/header.php';
             <input type="hidden" name="action" value="add">
         <?php endif; ?>
         
+        <?php if (!$editStudent): ?>
+        <p class="text-sm text-gray-600 mb-4">หมายเหตุ: รหัสนักเรียนจะถูกสร้างอัตโนมัติตามกลุ่มเรียน</p>
+        <?php else: ?>
+        <div class="mb-4">
+            <label class="block text-gray-700 text-sm font-bold mb-2">รหัสนักเรียน</label>
+            <input type="text" value="<?php echo htmlspecialchars($editStudent['student_code']); ?>" disabled
+                   class="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100">
+        </div>
+        <?php endif; ?>
+        
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-                <label class="block text-gray-700 text-sm font-bold mb-2">รหัสนักเรียน *</label>
-                <input type="text" name="student_code" required
-                       value="<?php echo $editStudent ? htmlspecialchars($editStudent['student_code']) : ''; ?>"
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
             <div>
                 <label class="block text-gray-700 text-sm font-bold mb-2">ชื่อ-นามสกุล *</label>
                 <input type="text" name="full_name" required
@@ -110,22 +154,57 @@ require_once 'includes/header.php';
                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">เพศ *</label>
+                <select name="gender" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="ชาย" <?php echo (!$editStudent || $editStudent['gender'] === 'ชาย') ? 'selected' : ''; ?>>ชาย</option>
+                    <option value="หญิง" <?php echo ($editStudent && $editStudent['gender'] === 'หญิง') ? 'selected' : ''; ?>>หญิง</option>
+                    <option value="อื่นๆ" <?php echo ($editStudent && $editStudent['gender'] === 'อื่นๆ') ? 'selected' : ''; ?>>อื่นๆ</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">วันเดือนปีเกิด</label>
+                <input type="date" name="birthdate"
+                       value="<?php echo $editStudent && $editStudent['birthdate'] ? htmlspecialchars($editStudent['birthdate']) : ''; ?>"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">กลุ่มเรียน *</label>
+                <select name="class_group_id" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">-- เลือกกลุ่มเรียน --</option>
+                    <?php foreach ($classGroups as $group): ?>
+                        <option value="<?php echo $group['id']; ?>" 
+                                <?php echo ($editStudent && $editStudent['class_group_id'] == $group['id']) ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($group['group_code'] . ' - ' . $group['group_name']); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">Username</label>
+                <input type="text" name="username"
+                       value="<?php echo $editStudent ? htmlspecialchars($editStudent['username'] ?? '') : ''; ?>"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <?php if (!$editStudent): ?>
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">Password</label>
+                <input type="password" name="password"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <p class="text-xs text-gray-500 mt-1">เว้นว่างไว้ถ้าไม่ต้องการตั้งรหัสผ่าน</p>
+            </div>
+            <?php endif; ?>
+            <div>
                 <label class="block text-gray-700 text-sm font-bold mb-2">อีเมล</label>
                 <input type="email" name="email"
-                       value="<?php echo $editStudent ? htmlspecialchars($editStudent['email']) : ''; ?>"
+                       value="<?php echo $editStudent ? htmlspecialchars($editStudent['email'] ?? '') : ''; ?>"
                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
                 <label class="block text-gray-700 text-sm font-bold mb-2">เบอร์โทรศัพท์</label>
                 <input type="text" name="phone"
-                       value="<?php echo $editStudent ? htmlspecialchars($editStudent['phone']) : ''; ?>"
-                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            </div>
-            <div>
-                <label class="block text-gray-700 text-sm font-bold mb-2">ระดับชั้น *</label>
-                <input type="text" name="grade" required
-                       value="<?php echo $editStudent ? htmlspecialchars($editStudent['grade']) : ''; ?>"
-                       placeholder="เช่น ม.1, ม.2"
+                       value="<?php echo $editStudent ? htmlspecialchars($editStudent['phone'] ?? '') : ''; ?>"
                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
         </div>
@@ -150,9 +229,10 @@ require_once 'includes/header.php';
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">รหัสนักเรียน</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ชื่อ-นามสกุล</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">อีเมล</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">เบอร์โทร</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ระดับชั้น</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">เพศ</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">วันเกิด</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">กลุ่มเรียน</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">จัดการ</th>
                 </tr>
             </thead>
@@ -161,9 +241,10 @@ require_once 'includes/header.php';
                     <tr>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($student['student_code']); ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($student['full_name']); ?></td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($student['email'] ?: '-'); ?></td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($student['phone'] ?: '-'); ?></td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($student['grade']); ?></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($student['gender'] ?? '-'); ?></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo $student['birthdate'] ? date('d/m/Y', strtotime($student['birthdate'])) : '-'; ?></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($student['group_name'] ?? '-'); ?></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($student['username'] ?: '-'); ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                             <a href="?edit=<?php echo $student['id']; ?>" class="text-blue-600 hover:text-blue-800 mr-3">แก้ไข</a>
                             <form method="POST" action="" class="inline" onsubmit="return confirm('คุณแน่ใจหรือไม่ว่าต้องการลบ?');">

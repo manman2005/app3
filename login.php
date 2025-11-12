@@ -9,7 +9,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
     
     if (!empty($username) && !empty($password)) {
-        $stmt = $pdo->prepare("SELECT id, username, password, full_name FROM users WHERE username = ?");
+        // Try to login as admin (users table)
+        $stmt = $pdo->prepare("SELECT id, username, password, full_name, role FROM users WHERE username = ?");
         $stmt->execute([$username]);
         $user = $stmt->fetch();
         
@@ -17,11 +18,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $user['username'];
             $_SESSION['full_name'] = $user['full_name'];
+            $_SESSION['role'] = $user['role'] ?? 'admin';
+            $_SESSION['user_type'] = 'admin';
             header('Location: index.php');
             exit();
-        } else {
-            $error = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
         }
+        
+        // Try to login as teacher
+        $stmt = $pdo->prepare("SELECT id, teacher_code, full_name, username, password FROM teachers WHERE username = ? AND password IS NOT NULL");
+        $stmt->execute([$username]);
+        $teacher = $stmt->fetch();
+        
+        if ($teacher && password_verify($password, $teacher['password'])) {
+            $_SESSION['user_id'] = $teacher['id'];
+            $_SESSION['username'] = $teacher['username'];
+            $_SESSION['full_name'] = $teacher['full_name'];
+            $_SESSION['role'] = 'teacher';
+            $_SESSION['user_type'] = 'teacher';
+            header('Location: index.php');
+            exit();
+        }
+        
+        // Try to login as student
+        $stmt = $pdo->prepare("SELECT id, student_code, full_name, username, password FROM students WHERE username = ? AND password IS NOT NULL");
+        $stmt->execute([$username]);
+        $student = $stmt->fetch();
+        
+        if ($student && password_verify($password, $student['password'])) {
+            $_SESSION['user_id'] = $student['id'];
+            $_SESSION['username'] = $student['username'];
+            $_SESSION['full_name'] = $student['full_name'];
+            $_SESSION['role'] = 'student';
+            $_SESSION['user_type'] = 'student';
+            header('Location: index.php');
+            exit();
+        }
+        
+        $error = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
     } else {
         $error = 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน';
     }

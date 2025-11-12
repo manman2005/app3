@@ -2,10 +2,14 @@
 require_once 'config/database.php';
 require_once 'config/session.php';
 requireLogin();
+requireRole('admin');
 
-$pageTitle = 'จัดการครู';
+$pageTitle = 'จัดการครู-อาจารย์';
 $message = '';
 $messageType = '';
+
+// Get majors for dropdown
+$majors = $pdo->query("SELECT * FROM majors ORDER BY major_code")->fetchAll();
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -13,13 +17,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($_POST['action'] === 'add') {
             $teacher_code = $_POST['teacher_code'] ?? '';
             $full_name = $_POST['full_name'] ?? '';
+            $gender = $_POST['gender'] ?? 'ชาย';
+            $major_id = $_POST['major_id'] ?? null;
+            $username = $_POST['username'] ?? '';
+            $password = $_POST['password'] ?? '';
             $email = $_POST['email'] ?? '';
             $phone = $_POST['phone'] ?? '';
             
             try {
-                $stmt = $pdo->prepare("INSERT INTO teachers (teacher_code, full_name, email, phone) VALUES (?, ?, ?, ?)");
-                $stmt->execute([$teacher_code, $full_name, $email, $phone]);
-                $message = 'เพิ่มครูสำเร็จ';
+                $hashedPassword = !empty($password) ? password_hash($password, PASSWORD_DEFAULT) : null;
+                $stmt = $pdo->prepare("INSERT INTO teachers (teacher_code, full_name, gender, major_id, username, password, email, phone) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$teacher_code, $full_name, $gender, $major_id, $username ?: null, $hashedPassword, $email ?: null, $phone ?: null]);
+                $message = 'เพิ่มครู-อาจารย์สำเร็จ';
                 $messageType = 'success';
             } catch (PDOException $e) {
                 $message = 'เกิดข้อผิดพลาด: ' . $e->getMessage();
@@ -29,13 +38,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $_POST['id'] ?? 0;
             $teacher_code = $_POST['teacher_code'] ?? '';
             $full_name = $_POST['full_name'] ?? '';
+            $gender = $_POST['gender'] ?? 'ชาย';
+            $major_id = $_POST['major_id'] ?? null;
+            $username = $_POST['username'] ?? '';
             $email = $_POST['email'] ?? '';
             $phone = $_POST['phone'] ?? '';
             
             try {
-                $stmt = $pdo->prepare("UPDATE teachers SET teacher_code = ?, full_name = ?, email = ?, phone = ? WHERE id = ?");
-                $stmt->execute([$teacher_code, $full_name, $email, $phone, $id]);
-                $message = 'แก้ไขข้อมูลครูสำเร็จ';
+                $stmt = $pdo->prepare("UPDATE teachers SET teacher_code = ?, full_name = ?, gender = ?, major_id = ?, username = ?, email = ?, phone = ? WHERE id = ?");
+                $stmt->execute([$teacher_code, $full_name, $gender, $major_id, $username ?: null, $email ?: null, $phone ?: null, $id]);
+                $message = 'แก้ไขข้อมูลครู-อาจารย์สำเร็จ';
                 $messageType = 'success';
             } catch (PDOException $e) {
                 $message = 'เกิดข้อผิดพลาด: ' . $e->getMessage();
@@ -46,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 $stmt = $pdo->prepare("DELETE FROM teachers WHERE id = ?");
                 $stmt->execute([$id]);
-                $message = 'ลบครูสำเร็จ';
+                $message = 'ลบครู-อาจารย์สำเร็จ';
                 $messageType = 'success';
             } catch (PDOException $e) {
                 $message = 'เกิดข้อผิดพลาด: ' . $e->getMessage();
@@ -56,8 +68,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Get all teachers
-$teachers = $pdo->query("SELECT * FROM teachers ORDER BY teacher_code")->fetchAll();
+// Get all teachers with major info
+$teachers = $pdo->query("
+    SELECT t.*, m.major_name 
+    FROM teachers t
+    LEFT JOIN majors m ON t.major_id = m.id
+    ORDER BY t.teacher_code
+")->fetchAll();
 
 // Get teacher for editing
 $editTeacher = null;
@@ -108,15 +125,51 @@ require_once 'includes/header.php';
                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">เพศ *</label>
+                <select name="gender" required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="ชาย" <?php echo (!$editTeacher || $editTeacher['gender'] === 'ชาย') ? 'selected' : ''; ?>>ชาย</option>
+                    <option value="หญิง" <?php echo ($editTeacher && $editTeacher['gender'] === 'หญิง') ? 'selected' : ''; ?>>หญิง</option>
+                    <option value="อื่นๆ" <?php echo ($editTeacher && $editTeacher['gender'] === 'อื่นๆ') ? 'selected' : ''; ?>>อื่นๆ</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">สาขาวิชา</label>
+                <select name="major_id"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">-- เลือกสาขาวิชา --</option>
+                    <?php foreach ($majors as $major): ?>
+                        <option value="<?php echo $major['id']; ?>" 
+                                <?php echo ($editTeacher && $editTeacher['major_id'] == $major['id']) ? 'selected' : ''; ?>>
+                            <?php echo htmlspecialchars($major['major_code'] . ' - ' . $major['major_name']); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">Username</label>
+                <input type="text" name="username"
+                       value="<?php echo $editTeacher ? htmlspecialchars($editTeacher['username'] ?? '') : ''; ?>"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <?php if (!$editTeacher): ?>
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">Password</label>
+                <input type="password" name="password"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <p class="text-xs text-gray-500 mt-1">เว้นว่างไว้ถ้าไม่ต้องการตั้งรหัสผ่าน</p>
+            </div>
+            <?php endif; ?>
+            <div>
                 <label class="block text-gray-700 text-sm font-bold mb-2">อีเมล</label>
                 <input type="email" name="email"
-                       value="<?php echo $editTeacher ? htmlspecialchars($editTeacher['email']) : ''; ?>"
+                       value="<?php echo $editTeacher ? htmlspecialchars($editTeacher['email'] ?? '') : ''; ?>"
                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
                 <label class="block text-gray-700 text-sm font-bold mb-2">เบอร์โทรศัพท์</label>
                 <input type="text" name="phone"
-                       value="<?php echo $editTeacher ? htmlspecialchars($editTeacher['phone']) : ''; ?>"
+                       value="<?php echo $editTeacher ? htmlspecialchars($editTeacher['phone'] ?? '') : ''; ?>"
                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
         </div>
@@ -141,8 +194,9 @@ require_once 'includes/header.php';
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">รหัสครู</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ชื่อ-นามสกุล</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">อีเมล</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">เบอร์โทร</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">เพศ</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">สาขาวิชา</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">จัดการ</th>
                 </tr>
             </thead>
@@ -151,8 +205,9 @@ require_once 'includes/header.php';
                     <tr>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($teacher['teacher_code']); ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($teacher['full_name']); ?></td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($teacher['email'] ?: '-'); ?></td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($teacher['phone'] ?: '-'); ?></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($teacher['gender'] ?? '-'); ?></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($teacher['major_name'] ?: '-'); ?></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($teacher['username'] ?: '-'); ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
                             <a href="?edit=<?php echo $teacher['id']; ?>" class="text-blue-600 hover:text-blue-800 mr-3">แก้ไข</a>
                             <form method="POST" action="" class="inline" onsubmit="return confirm('คุณแน่ใจหรือไม่ว่าต้องการลบ?');">

@@ -7,10 +7,11 @@ $pageTitle = 'แดชบอร์ด';
 
 // Get statistics
 $stats = [
-    'teachers' => $pdo->query("SELECT COUNT(*) as count FROM teachers")->fetch()['count'],
     'students' => $pdo->query("SELECT COUNT(*) as count FROM students")->fetch()['count'],
-    'subjects' => $pdo->query("SELECT COUNT(*) as count FROM subjects")->fetch()['count'],
+    'teachers' => $pdo->query("SELECT COUNT(*) as count FROM teachers")->fetch()['count'],
     'classrooms' => $pdo->query("SELECT COUNT(*) as count FROM classrooms")->fetch()['count'],
+    'class_groups' => $pdo->query("SELECT COUNT(*) as count FROM class_groups")->fetch()['count'],
+    'subjects' => $pdo->query("SELECT COUNT(*) as count FROM subjects")->fetch()['count'],
     'timetable_entries' => $pdo->query("SELECT COUNT(*) as count FROM timetable")->fetch()['count']
 ];
 
@@ -39,17 +40,7 @@ require_once 'includes/header.php';
 </div>
 
 <!-- Statistics Cards -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-    <div class="bg-white rounded-lg shadow-md p-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-gray-600 text-sm">ครู</p>
-                <p class="text-3xl font-bold text-blue-600"><?php echo $stats['teachers']; ?></p>
-            </div>
-            <div class="text-4xl">👨‍🏫</div>
-        </div>
-    </div>
-    
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
     <div class="bg-white rounded-lg shadow-md p-6">
         <div class="flex items-center justify-between">
             <div>
@@ -63,10 +54,10 @@ require_once 'includes/header.php';
     <div class="bg-white rounded-lg shadow-md p-6">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-gray-600 text-sm">วิชา</p>
-                <p class="text-3xl font-bold text-purple-600"><?php echo $stats['subjects']; ?></p>
+                <p class="text-gray-600 text-sm">ครู-อาจารย์</p>
+                <p class="text-3xl font-bold text-blue-600"><?php echo $stats['teachers']; ?></p>
             </div>
-            <div class="text-4xl">📚</div>
+            <div class="text-4xl">👨‍🏫</div>
         </div>
     </div>
     
@@ -83,7 +74,27 @@ require_once 'includes/header.php';
     <div class="bg-white rounded-lg shadow-md p-6">
         <div class="flex items-center justify-between">
             <div>
-                <p class="text-gray-600 text-sm">ตารางสอน</p>
+                <p class="text-gray-600 text-sm">กลุ่มเรียน</p>
+                <p class="text-3xl font-bold text-indigo-600"><?php echo $stats['class_groups']; ?></p>
+            </div>
+            <div class="text-4xl">👥</div>
+        </div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-gray-600 text-sm">รายวิชา</p>
+                <p class="text-3xl font-bold text-purple-600"><?php echo $stats['subjects']; ?></p>
+            </div>
+            <div class="text-4xl">📚</div>
+        </div>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-gray-600 text-sm">ตารางเรียน</p>
                 <p class="text-3xl font-bold text-red-600"><?php echo $stats['timetable_entries']; ?></p>
             </div>
             <div class="text-4xl">📅</div>

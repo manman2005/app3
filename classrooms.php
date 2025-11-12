@@ -2,6 +2,7 @@
 require_once 'config/database.php';
 require_once 'config/session.php';
 requireLogin();
+requireRole('admin');
 
 $pageTitle = 'จัดการห้องเรียน';
 $message = '';
@@ -13,12 +14,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($_POST['action'] === 'add') {
             $room_code = $_POST['room_code'] ?? '';
             $room_name = $_POST['room_name'] ?? '';
+            $building = $_POST['building'] ?? '';
+            $floor = $_POST['floor'] ?? null;
             $capacity = $_POST['capacity'] ?? 30;
             $room_type = $_POST['room_type'] ?? '';
             
             try {
-                $stmt = $pdo->prepare("INSERT INTO classrooms (room_code, room_name, capacity, room_type) VALUES (?, ?, ?, ?)");
-                $stmt->execute([$room_code, $room_name, $capacity, $room_type]);
+                $stmt = $pdo->prepare("INSERT INTO classrooms (room_code, room_name, building, floor, capacity, room_type) VALUES (?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$room_code, $room_name, $building ?: null, $floor ?: null, $capacity, $room_type]);
                 $message = 'เพิ่มห้องเรียนสำเร็จ';
                 $messageType = 'success';
             } catch (PDOException $e) {
@@ -29,12 +32,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $id = $_POST['id'] ?? 0;
             $room_code = $_POST['room_code'] ?? '';
             $room_name = $_POST['room_name'] ?? '';
+            $building = $_POST['building'] ?? '';
+            $floor = $_POST['floor'] ?? null;
             $capacity = $_POST['capacity'] ?? 30;
             $room_type = $_POST['room_type'] ?? '';
             
             try {
-                $stmt = $pdo->prepare("UPDATE classrooms SET room_code = ?, room_name = ?, capacity = ?, room_type = ? WHERE id = ?");
-                $stmt->execute([$room_code, $room_name, $capacity, $room_type, $id]);
+                $stmt = $pdo->prepare("UPDATE classrooms SET room_code = ?, room_name = ?, building = ?, floor = ?, capacity = ?, room_type = ? WHERE id = ?");
+                $stmt->execute([$room_code, $room_name, $building ?: null, $floor ?: null, $capacity, $room_type, $id]);
                 $message = 'แก้ไขข้อมูลห้องเรียนสำเร็จ';
                 $messageType = 'success';
             } catch (PDOException $e) {
@@ -99,12 +104,26 @@ require_once 'includes/header.php';
                 <label class="block text-gray-700 text-sm font-bold mb-2">รหัสห้อง *</label>
                 <input type="text" name="room_code" required
                        value="<?php echo $editClassroom ? htmlspecialchars($editClassroom['room_code']) : ''; ?>"
+                       placeholder="เช่น 1061, 1062, 241, 242"
                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
                 <label class="block text-gray-700 text-sm font-bold mb-2">ชื่อห้อง *</label>
                 <input type="text" name="room_name" required
                        value="<?php echo $editClassroom ? htmlspecialchars($editClassroom['room_name']) : ''; ?>"
+                       placeholder="เช่น ห้องปฏิบัติการเทคโนโลยีสารสนเทศ 242"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">อาคาร</label>
+                <input type="text" name="building"
+                       value="<?php echo $editClassroom ? htmlspecialchars($editClassroom['building'] ?? '') : ''; ?>"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label class="block text-gray-700 text-sm font-bold mb-2">ชั้น</label>
+                <input type="number" name="floor" min="1" max="20"
+                       value="<?php echo $editClassroom ? htmlspecialchars($editClassroom['floor'] ?? '') : ''; ?>"
                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
             </div>
             <div>
@@ -142,6 +161,8 @@ require_once 'includes/header.php';
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">รหัสห้อง</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ชื่อห้อง</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">อาคาร</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ชั้น</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ความจุ</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ประเภท</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">จัดการ</th>
@@ -152,6 +173,8 @@ require_once 'includes/header.php';
                     <tr>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($classroom['room_code']); ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($classroom['room_name']); ?></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($classroom['building'] ?: '-'); ?></td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($classroom['floor'] ?: '-'); ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($classroom['capacity']); ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?php echo htmlspecialchars($classroom['room_type'] ?: '-'); ?></td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm">
